@@ -156,7 +156,7 @@ async def send_button_async(
         )
     except ImportError as error:
         raise RealCommandError(
-            reason="Real-provider dependencies are missing.",
+            reason="Xbox command dependencies are missing.",
         ) from error
 
     if command.button == "Home":
@@ -234,7 +234,7 @@ async def build_xbox_live_client(tokens_file: Path | None) -> XboxLiveLaunchClie
         from pythonxbox.scripts import CLIENT_ID, CLIENT_SECRET  # noqa: PLC0415
     except ImportError as error:
         raise RealCommandError(
-            reason="Real-provider dependencies are missing.",
+            reason="Xbox command dependencies are missing.",
         ) from error
 
     resolved_tokens_file = default_tokens_file() if tokens_file is None else tokens_file

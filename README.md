@@ -16,7 +16,7 @@ uv sync
 uv run xboxctl --help
 ```
 
-Install the real Xbox provider dependencies:
+Install the Xbox command dependencies:
 
 ```bash
 uv sync --extra real

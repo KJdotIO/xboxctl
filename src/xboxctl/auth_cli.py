@@ -37,7 +37,7 @@ class AuthValidationPayload(TypedDict):
     reason: str
     tokens_file: str
     missing_fields: list[RequiredTokenField]
-    can_attempt_real_provider: bool
+    can_use_xbox_commands: bool
     setup_command: str
     note: str
 
@@ -53,7 +53,7 @@ class WhoamiPayload(TypedDict):
 
 
 auth_app = typer.Typer(
-    help="Real-provider authentication setup.",
+    help="Xbox authentication setup.",
     no_args_is_help=True,
 )
 
@@ -62,7 +62,7 @@ def auth_status_payload(status: AuthStatus) -> AuthStatusPayload:
     note = (
         "Token file found, but tokens are not validated yet."
         if status.configured
-        else "Token file not found. Run the setup command before using real mode."
+        else "Token file not found. Run the setup command before sending commands."
     )
     return {
         "configured": status.configured,
@@ -77,7 +77,7 @@ def auth_validation_payload(validation: AuthValidation) -> AuthValidationPayload
         case AuthValidationReason.OK:
             note = "Token file has the expected python-xbox OAuth token shape."
         case AuthValidationReason.MISSING_FILE:
-            note = "Token file not found. Run the setup command before using real mode."
+            note = "Token file not found. Run setup before sending commands."
         case AuthValidationReason.MALFORMED_JSON:
             note = "Token file is not valid JSON. Re-run authentication."
         case AuthValidationReason.MISSING_FIELDS:
@@ -87,7 +87,7 @@ def auth_validation_payload(validation: AuthValidation) -> AuthValidationPayload
         "reason": validation.reason.value,
         "tokens_file": str(validation.tokens_file),
         "missing_fields": list(validation.missing_fields),
-        "can_attempt_real_provider": validation.can_attempt_real_provider,
+        "can_use_xbox_commands": validation.can_use_xbox_commands,
         "setup_command": SETUP_COMMAND,
         "note": note,
     }
@@ -194,7 +194,7 @@ def validate(
         typer.echo(f"Token file: {payload['tokens_file']}")
         if payload["missing_fields"]:
             typer.echo(f"Missing fields: {', '.join(payload['missing_fields'])}")
-        typer.echo(f"Can attempt real provider: {payload['can_attempt_real_provider']}")
+        typer.echo(f"Can use Xbox commands: {payload['can_use_xbox_commands']}")
     if not payload["valid"]:
         exit_missing_auth()
 
@@ -235,7 +235,7 @@ def whoami(
 
 @auth_app.command("instructions")
 def instructions() -> None:
-    typer.echo("1. Install the optional real-provider tools:")
+    typer.echo("1. Install the Xbox command dependencies:")
     typer.echo("   uv sync --extra real")
     typer.echo("2. Start Microsoft sign-in and approve Xbox Live access:")
     typer.echo("   uv run xboxctl auth login")

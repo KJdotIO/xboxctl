@@ -1,4 +1,4 @@
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from xboxctl.models import Console, InstalledApp, StorageDevice
 
@@ -30,7 +30,7 @@ class CommandPayload(TypedDict):
 class McpPayload(TypedDict):
     name: str
     version: str
-    provider: str
+    provider: NotRequired[str]
     commands: list[CommandPayload]
 
 

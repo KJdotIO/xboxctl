@@ -75,7 +75,7 @@ class AuthValidation:
     missing_fields: tuple[RequiredTokenField, ...]
 
     @property
-    def can_attempt_real_provider(self) -> bool:
+    def can_use_xbox_commands(self) -> bool:
         return self.valid
 
 

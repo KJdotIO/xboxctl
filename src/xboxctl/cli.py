@@ -58,7 +58,7 @@ def main(
         typer.Option(
             "--provider",
             envvar="XBOXCTL_PROVIDER",
-            help="Select the provider backend.",
+            help="Advanced: select a provider backend. Use fake for local tests.",
         ),
     ] = DEFAULT_PROVIDER,
 ) -> None:
@@ -186,7 +186,8 @@ def doctor(
     ] = None,
 ) -> None:
     validation = validate_auth_tokens()
-    typer.echo(f"Provider: {selected_provider.value}")
+    if selected_provider == ProviderName.FAKE:
+        typer.echo("Mode: fake provider")
     typer.echo(f"Auth token file: {validation.tokens_file}")
     typer.echo(f"Auth token shape: {validation.reason.value}")
     if not validation.valid:
@@ -256,7 +257,6 @@ def mcp_describe() -> None:
     manifest: McpPayload = {
         "name": "xboxctl",
         "version": __version__,
-        "provider": selected_provider.value,
         "commands": [
             {"command": "consoles", "requires_confirm": False},
             {"command": "status", "requires_confirm": False},
@@ -271,4 +271,6 @@ def mcp_describe() -> None:
             {"command": "observe", "requires_confirm": False},
         ],
     }
+    if selected_provider == ProviderName.FAKE:
+        manifest["provider"] = selected_provider.value
     print_json(console, manifest)

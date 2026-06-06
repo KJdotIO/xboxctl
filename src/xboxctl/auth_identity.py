@@ -23,7 +23,7 @@ PROFILE_SETTINGS: Final = (
     PROFILE_ACCOUNT_TIER,
 )
 MISSING_REAL_PROVIDER_TOOLS: Final = (
-    "Real-provider dependencies are missing. Run: uv sync --extra real"
+    "Xbox command dependencies are missing. Run: uv sync --extra real"
 )
 MISSING_XSTS_AUTH_MESSAGE: Final = "Xbox authentication did not return an XSTS token."
 

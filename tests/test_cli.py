@@ -45,7 +45,7 @@ def test_status_json_returns_sample_console_state() -> None:
     assert '"active_title": "Halo Infinite"' in result.stdout
 
 
-def test_real_provider_is_default_for_consoles_without_auth(tmp_path: Path) -> None:
+def test_default_consoles_requires_auth_without_token_file(tmp_path: Path) -> None:
     # Given: no provider flag or environment override, and no Xbox token file.
     token_file = tmp_path / "tokens.json"
     arguments = ["consoles"]
@@ -53,9 +53,9 @@ def test_real_provider_is_default_for_consoles_without_auth(tmp_path: Path) -> N
     # When: consoles are listed.
     result = run_cli_with_env(arguments, {"XBOXCTL_TOKENS_FILE": str(token_file)})
 
-    # Then: the real provider asks for auth instead of falling back to fake data.
+    # Then: the CLI asks for auth instead of falling back to fake data.
     assert result.exit_code == 1
-    assert "Real Xbox provider is not configured." in result.output
+    assert "Xbox is not configured." in result.output
     assert "uv run xboxctl auth login" in result.output
 
 
@@ -71,8 +71,8 @@ def test_fake_provider_can_be_selected_explicitly() -> None:
     assert '"name": "Living Room Series X"' in result.stdout
 
 
-def test_real_provider_without_auth_fails_with_setup_message() -> None:
-    # Given: the real provider is requested without Xbox credentials.
+def test_default_provider_without_auth_fails_with_setup_message() -> None:
+    # Given: Xbox commands are requested without credentials.
     runner = CliRunner(env={"XBOXCTL_TOKENS_FILE": "/missing/xboxctl/tokens.json"})
     arguments = ["consoles"]
 
@@ -81,13 +81,13 @@ def test_real_provider_without_auth_fails_with_setup_message() -> None:
 
     # Then: the CLI gives a clear setup failure without pretending success.
     assert result.exit_code == 1
-    assert "Real Xbox provider is not configured." in result.output
+    assert "Xbox is not configured." in result.output
     assert "uv run xboxctl auth login" in result.output
     assert "No console command was sent." in result.output
 
 
 def test_provider_can_be_selected_from_environment() -> None:
-    # Given: the real provider is requested through the environment.
+    # Given: the default provider is requested through the environment.
     runner = CliRunner(
         env={
             "XBOXCTL_PROVIDER": "real",
@@ -100,7 +100,7 @@ def test_provider_can_be_selected_from_environment() -> None:
 
     # Then: the same explicit setup message is shown.
     assert result.exit_code == 1
-    assert "Real Xbox provider is not configured." in result.output
+    assert "Xbox is not configured." in result.output
 
 
 def test_auth_status_reports_missing_token_file(tmp_path: Path) -> None:
@@ -111,7 +111,7 @@ def test_auth_status_reports_missing_token_file(tmp_path: Path) -> None:
     # When: auth status is requested.
     result = run_cli_with_env(arguments, {"XBOXCTL_TOKENS_FILE": str(token_file)})
 
-    # Then: the CLI reports that real-provider auth is not configured.
+    # Then: the CLI reports that Xbox auth is not configured.
     assert result.exit_code == 1
     assert '"configured": false' in result.stdout
     assert f'"tokens_file": "{token_file}"' in result.stdout
@@ -134,7 +134,7 @@ def test_auth_status_reports_found_file_without_reading_it(tmp_path: Path) -> No
 
 
 def test_auth_instructions_show_xboxctl_login_setup_command() -> None:
-    # Given: a user wants the safe setup path for real-provider auth.
+    # Given: a user wants the safe setup path for Xbox auth.
     arguments = ["auth", "instructions"]
 
     # When: auth instructions are requested.
@@ -418,16 +418,16 @@ def test_text_keeps_meaningful_outer_spaces() -> None:
     assert "Sent text to Living Room Series X:  hello " in result.output
 
 
-def test_doctor_reports_provider_and_route_for_console_ip() -> None:
+def test_doctor_reports_fake_mode_and_route_for_console_ip() -> None:
     # Given: a local route diagnostic request for a reachable loopback address.
     arguments = fake_arguments(["doctor", "--console-ip", "127.0.0.1"])
 
     # When: diagnostics are requested.
     result = run_cli(arguments)
 
-    # Then: the CLI reports provider and preferred local route details.
+    # Then: the CLI reports fake mode and preferred local route details.
     assert result.exit_code == 0
-    assert "Provider" in result.stdout
+    assert "Mode" in result.stdout
     assert "fake" in result.stdout
     assert "Preferred local IP" in result.stdout
     assert "127." in result.stdout
@@ -488,23 +488,23 @@ def test_mcp_describe_lists_supported_commands() -> None:
 
     # Then: supported v1 commands are listed.
     assert result.exit_code == 0
-    assert '"provider": "real"' in result.stdout
+    assert '"provider"' not in result.stdout
     assert '"command": "status"' in result.stdout
     assert '"command": "launch"' in result.stdout
     assert '"command": "auth"' in result.stdout
     assert '"requires_confirm": true' in result.stdout
 
 
-def test_mcp_describe_reports_selected_provider() -> None:
-    # Given: the real provider is selected for machine-readable command discovery.
-    arguments = ["--provider", "real", "mcp", "describe"]
+def test_mcp_describe_reports_fake_provider_when_selected() -> None:
+    # Given: the fake provider is selected for machine-readable command discovery.
+    arguments = ["--provider", "fake", "mcp", "describe"]
 
     # When: the manifest is requested.
     result = run_cli(arguments)
 
     # Then: the manifest reflects the selected provider.
     assert result.exit_code == 0
-    assert '"provider": "real"' in result.stdout
+    assert '"provider": "fake"' in result.stdout
 
 
 def test_observe_screenshot_dry_run_prints_helper_command(tmp_path: Path) -> None:
