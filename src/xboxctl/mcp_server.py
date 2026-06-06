@@ -1,5 +1,7 @@
 import sys
 from collections.abc import Sequence
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Final, TypedDict
 
@@ -34,10 +36,39 @@ from xboxctl.serialise import (
     storage_payload,
 )
 
-mcp = FastMCP(name="xboxctl")
+HTTP_HOST: Final = "127.0.0.1"
+HTTP_PORT: Final = 3000
+HTTP_PATH: Final = "/mcp"
+MCP_USAGE: Final = (
+    "usage: xboxctl-mcp [--http] [--provider fake|real] "
+    "[--host HOST] [--port PORT] [--path PATH] [--version]"
+)
+
+mcp = FastMCP(
+    name="xboxctl",
+    log_level="WARNING",
+    json_response=True,
+    stateless_http=True,
+    host=HTTP_HOST,
+    port=HTTP_PORT,
+    streamable_http_path=HTTP_PATH,
+)
 selected_provider = ProviderName.REAL
 DEFAULT_SESSION_FILE_TEXT: Final = str(DEFAULT_SESSION_FILE)
-MCP_USAGE: Final = "usage: xboxctl-mcp [--provider fake|real] [--version]"
+
+
+class McpTransport(StrEnum):
+    STDIO = "stdio"
+    HTTP = "http"
+
+
+@dataclass(frozen=True, slots=True)
+class McpServerConfig:
+    provider: ProviderName = ProviderName.REAL
+    transport: McpTransport = McpTransport.STDIO
+    host: str = HTTP_HOST
+    port: int = HTTP_PORT
+    path: str = HTTP_PATH
 
 
 class MessagePayload(TypedDict):
@@ -338,21 +369,69 @@ def cleanup_observe(
     }
 
 
-def provider_from_args(argv: Sequence[str]) -> ProviderName:
-    match tuple(argv):
-        case ():
-            return ProviderName.REAL
-        case ("--version",):
-            print(f"xboxctl {__version__}")  # noqa: T201
-            raise SystemExit(0)
-        case ("--provider", provider_value):
-            return ProviderName(provider_value)
-        case _:
-            print(MCP_USAGE, file=sys.stderr)  # noqa: T201
-            raise SystemExit(2)
+def argument_value(arguments: Sequence[str], index: int, option: str) -> str:
+    try:
+        return arguments[index + 1]
+    except IndexError:
+        print(f"{option} requires a value\n{MCP_USAGE}", file=sys.stderr)  # noqa: T201
+        raise SystemExit(2) from None
+
+
+def parse_mcp_config(argv: Sequence[str]) -> McpServerConfig:
+    provider_name = ProviderName.REAL
+    transport = McpTransport.STDIO
+    host = HTTP_HOST
+    port = HTTP_PORT
+    path = HTTP_PATH
+    index = 0
+    while index < len(argv):
+        option = argv[index]
+        match option:
+            case "--version":
+                print(f"xboxctl {__version__}")  # noqa: T201
+                raise SystemExit(0)
+            case "--http":
+                transport = McpTransport.HTTP
+                index += 1
+            case "--stdio":
+                transport = McpTransport.STDIO
+                index += 1
+            case "--provider":
+                provider_name = ProviderName(argument_value(argv, index, option))
+                index += 2
+            case "--host":
+                host = argument_value(argv, index, option)
+                index += 2
+            case "--port":
+                port = int(argument_value(argv, index, option))
+                index += 2
+            case "--path":
+                path = argument_value(argv, index, option)
+                index += 2
+            case _:
+                print(MCP_USAGE, file=sys.stderr)  # noqa: T201
+                raise SystemExit(2)
+    return McpServerConfig(
+        provider=provider_name,
+        transport=transport,
+        host=host,
+        port=port,
+        path=path,
+    )
+
+
+def run_mcp_server(config: McpServerConfig) -> None:
+    global selected_provider  # noqa: PLW0603
+    selected_provider = config.provider
+    match config.transport:
+        case McpTransport.STDIO:
+            mcp.run()
+        case McpTransport.HTTP:
+            mcp.settings.host = config.host
+            mcp.settings.port = config.port
+            mcp.settings.streamable_http_path = config.path
+            mcp.run(transport="streamable-http")
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    global selected_provider  # noqa: PLW0603
-    selected_provider = provider_from_args(sys.argv[1:] if argv is None else argv)
-    mcp.run()
+    run_mcp_server(parse_mcp_config(sys.argv[1:] if argv is None else argv))

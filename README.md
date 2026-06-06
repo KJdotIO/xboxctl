@@ -177,6 +177,14 @@ Once the package is published, the config can use `uvx` instead:
 The MCP exposes the normal Xbox tools directly: status, apps, storage, launch,
 button presses, text, media, power, and observe session controls.
 
+Some clients need an HTTP MCP endpoint instead of stdio:
+
+```bash
+uv run xboxctl-mcp --http
+```
+
+That starts the local server at `http://127.0.0.1:3000/mcp`.
+
 For local tests, run:
 
 ```bash

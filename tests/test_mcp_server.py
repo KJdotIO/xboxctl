@@ -82,19 +82,48 @@ def test_mcp_provider_args_default_to_normal_xbox_commands() -> None:
     # Given: no MCP server options are passed.
     arguments: list[str] = []
 
-    # When: the provider is parsed.
-    provider = mcp_server.provider_from_args(arguments)
+    # When: the MCP server config is parsed.
+    config = mcp_server.parse_mcp_config(arguments)
 
     # Then: normal Xbox commands are selected.
-    assert provider == ProviderName.REAL
+    assert config.provider == ProviderName.REAL
+    assert config.transport == mcp_server.McpTransport.STDIO
 
 
 def test_mcp_provider_args_accept_fake_provider() -> None:
     # Given: fake mode is requested for local tests.
     arguments = ["--provider", "fake"]
 
-    # When: the provider is parsed.
-    provider = mcp_server.provider_from_args(arguments)
+    # When: the MCP server config is parsed.
+    config = mcp_server.parse_mcp_config(arguments)
 
     # Then: fake mode is selected.
-    assert provider == ProviderName.FAKE
+    assert config.provider == ProviderName.FAKE
+
+
+def test_mcp_provider_args_accept_http_defaults() -> None:
+    # Given: HTTP mode is requested for a local tunnel.
+    arguments = ["--http"]
+
+    # When: the MCP server config is parsed.
+    config = mcp_server.parse_mcp_config(arguments)
+
+    # Then: local HTTP defaults are selected.
+    assert config.transport == mcp_server.McpTransport.HTTP
+    assert config.host == "127.0.0.1"
+    assert config.port == 3000
+    assert config.path == "/mcp"
+
+
+def test_mcp_provider_args_accept_custom_http_address() -> None:
+    # Given: a custom local HTTP address is requested.
+    arguments = ["--http", "--host", "localhost", "--port", "3210", "--path", "/xbox"]
+
+    # When: the MCP server config is parsed.
+    config = mcp_server.parse_mcp_config(arguments)
+
+    # Then: the custom address is selected.
+    assert config.transport == mcp_server.McpTransport.HTTP
+    assert config.host == "localhost"
+    assert config.port == 3210
+    assert config.path == "/xbox"
