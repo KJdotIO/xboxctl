@@ -39,6 +39,7 @@ from xboxctl.providers.real_runners import (
     CloudMediaRunner,
     CloudPowerRunner,
     CloudTextRunner,
+    ComposedWakeRunner,
 )
 from xboxctl.typing_compat import override
 
@@ -93,6 +94,7 @@ class PythonXboxProvider:
     media_runner: MediaRunner | None = None
     text_runner: TextRunner | None = None
     power_runner: PowerRunner | None = None
+    wake_runner: PowerRunner | None = None
     tokens_file: Path | None = None
 
     def list_consoles(self) -> tuple[Console, ...]:
@@ -163,9 +165,12 @@ class PythonXboxProvider:
     def power(self, action: PowerAction) -> ProviderAction:
         console = self.status()
         try:
-            self.resolved_power_runner()(
-                PowerCommand(console_id=console.id, action=action),
-            )
+            command = PowerCommand(console_id=console.id, action=action)
+            match action:
+                case PowerAction.ON:
+                    self.resolved_wake_runner()(command)
+                case PowerAction.OFF | PowerAction.REBOOT:
+                    self.resolved_power_runner()(command)
         except RealCommandError as error:
             raise ProviderUnavailableError(reason=str(error)) from error
         return ProviderAction(message=f"Sent {action.value} to {console.name}.")
@@ -199,6 +204,11 @@ class PythonXboxProvider:
         if self.power_runner is not None:
             return self.power_runner
         return CloudPowerRunner(tokens_file=self.tokens_file)
+
+    def resolved_wake_runner(self) -> PowerRunner:
+        if self.wake_runner is not None:
+            return self.wake_runner
+        return ComposedWakeRunner(tokens_file=self.tokens_file)
 
 
 CLOUD_BUTTONS: Final[dict[str, str]] = {

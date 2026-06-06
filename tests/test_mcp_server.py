@@ -1,8 +1,11 @@
 from pathlib import Path
 
 import pytest
+from mcp.types import ImageContent, TextContent
 
 from xboxctl import mcp_server
+from xboxctl.mcp_content import screenshot_content
+from xboxctl.observe import ObserveCaptureFormat
 from xboxctl.providers.select import ProviderName
 
 
@@ -78,6 +81,61 @@ def test_mcp_observe_cleanup_removes_invalid_session_file(tmp_path: Path) -> Non
     assert not session_file.exists()
 
 
+def test_mcp_observe_capture_returns_valid_mcp_image_content(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: an observe capture writes a small PNG file.
+    image_path = tmp_path / "capture.png"
+    png_bytes = b"".join(
+        (
+            b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR",
+            b"\x00\x00\x00\x01\x00\x00\x00\x01",
+            b"\x08\x02\x00\x00\x00\x90wS\xde",
+        ),
+    )
+    _ = image_path.write_bytes(png_bytes)
+
+    def capture_stub(
+        output: str | None = None,
+        session_file: str = mcp_server.DEFAULT_SESSION_FILE_TEXT,
+        image_format: ObserveCaptureFormat = ObserveCaptureFormat.JPEG,
+        width: int = 960,
+        quality: int = 72,
+    ) -> Path:
+        _ = (output, session_file, image_format, width, quality)
+        return image_path
+
+    monkeypatch.setattr(mcp_server, "capture_xbox_observe", capture_stub)
+
+    # When: the MCP capture helper prepares its response.
+    content = mcp_server.capture_xbox_observe_content()
+
+    # Then: strict MCP content models are returned, not FastMCP helper objects.
+    assert isinstance(content[0], TextContent)
+    assert isinstance(content[1], ImageContent)
+    assert content[1].type == "image"
+    assert content[1].mimeType == "image/png"
+    assert content[1].data.startswith("iVBORw0KGgo")
+
+
+def test_screenshot_content_serialises_image_as_base64_mcp_content(
+    tmp_path: Path,
+) -> None:
+    # Given: a screenshot file exists on disk.
+    image_path = tmp_path / "capture.jpeg"
+    _ = image_path.write_bytes(b"fake-jpeg-bytes")
+
+    # When: screenshot content is built for an MCP response.
+    content = screenshot_content(image_path)
+
+    # Then: the image is represented as canonical MCP image content.
+    assert isinstance(content[0], TextContent)
+    assert isinstance(content[1], ImageContent)
+    assert content[1].mimeType == "image/jpeg"
+    assert content[1].data == "ZmFrZS1qcGVnLWJ5dGVz"
+
+
 def test_mcp_provider_args_default_to_normal_xbox_commands() -> None:
     # Given: no MCP server options are passed.
     arguments: list[str] = []
@@ -115,6 +173,34 @@ def test_mcp_provider_args_accept_http_defaults() -> None:
     assert config.path == "/mcp"
 
 
+def test_mcp_provider_args_accept_sse_defaults() -> None:
+    # Given: SSE mode is requested for clients that expect the older MCP HTTP transport.
+    arguments = ["--sse"]
+
+    # When: the MCP server config is parsed.
+    config = mcp_server.parse_mcp_config(arguments)
+
+    # Then: local SSE defaults are selected.
+    assert config.transport == mcp_server.McpTransport.SSE
+    assert config.host == "127.0.0.1"
+    assert config.port == 3000
+    assert config.path == "/sse"
+
+
+def test_mcp_provider_args_accept_dual_http_defaults() -> None:
+    # Given: combined HTTP mode is requested for clients that probe transports.
+    arguments = ["--dual-http"]
+
+    # When: the MCP server config is parsed.
+    config = mcp_server.parse_mcp_config(arguments)
+
+    # Then: local combined HTTP defaults are selected.
+    assert config.transport == mcp_server.McpTransport.DUAL_HTTP
+    assert config.host == "127.0.0.1"
+    assert config.port == 3000
+    assert config.path is None
+
+
 def test_mcp_provider_args_accept_custom_http_address() -> None:
     # Given: a custom local HTTP address is requested.
     arguments = ["--http", "--host", "localhost", "--port", "3210", "--path", "/xbox"]
@@ -127,3 +213,20 @@ def test_mcp_provider_args_accept_custom_http_address() -> None:
     assert config.host == "localhost"
     assert config.port == 3210
     assert config.path == "/xbox"
+
+
+def test_mcp_provider_args_accept_allowed_hosts() -> None:
+    # Given: public tunnel hostnames are explicitly trusted.
+    arguments = [
+        "--dual-http",
+        "--allow-host",
+        "xboxctl.example.test",
+        "--allow-host",
+        "example.test",
+    ]
+
+    # When: the MCP server config is parsed.
+    config = mcp_server.parse_mcp_config(arguments)
+
+    # Then: both hostnames are preserved.
+    assert config.allowed_hosts == ("xboxctl.example.test", "example.test")

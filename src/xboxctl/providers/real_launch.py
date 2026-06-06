@@ -200,7 +200,12 @@ async def verify_operation_succeeded(
 ) -> None:
     last_status = "missing"
     for attempt in range(config.attempts):
-        status = await smartglass.get_op_status(console_id, op_id)
+        try:
+            status = await smartglass.get_op_status(console_id, op_id)
+        except Exception:
+            if action == PowerAction.OFF:
+                return
+            raise
         matching_nodes = [node for node in status.op_status_list if node.op_id == op_id]
         if not matching_nodes:
             last_status = "missing"
@@ -209,10 +214,21 @@ async def verify_operation_succeeded(
             last_status = operation.operation_status.value
             if operation.succeeded:
                 return
+            if action == PowerAction.OFF and last_status in {
+                "OffConsoleError",
+                "TimedOut",
+            }:
+                return
             if last_status != "Pending":
                 break
         if attempt + 1 < config.attempts:
             await anyio.sleep(config.poll_seconds)
+    if action == PowerAction.OFF and last_status in {
+        "missing",
+        "OffConsoleError",
+        "TimedOut",
+    }:
+        return
     raise RealCommandError(
         reason=(
             f"Xbox power {action.value} operation did not succeed: "

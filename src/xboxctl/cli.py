@@ -1,3 +1,4 @@
+import os
 from typing import Annotated
 
 import typer
@@ -243,8 +244,18 @@ def power(
         bool,
         typer.Option("--confirm", help="Confirm the requested action."),
     ] = False,
+    wake_address: Annotated[
+        str | None,
+        typer.Option(
+            "--wake-address",
+            envvar="XBOXCTL_WAKE_ADDRESS",
+            help="Console IP address for local SmartGlass wake.",
+        ),
+    ] = None,
 ) -> None:
     require_confirm(confirm)
+    if wake_address is not None:
+        os.environ["XBOXCTL_WAKE_ADDRESS"] = wake_address
     try:
         provider_action = current_provider().power(action)
     except ProviderUnavailableError as error:

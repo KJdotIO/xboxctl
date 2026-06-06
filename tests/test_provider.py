@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from xboxctl.models import (
     Console,
     ConsoleId,
@@ -24,6 +26,11 @@ from xboxctl.providers.real_commands import (
     PressCommand,
     RealCommandError,
     TextCommand,
+)
+from xboxctl.providers.real_runners import (
+    ComposedWakeRunner,
+    address_cache_path,
+    read_cached_address,
 )
 from xboxctl.providers.select import ProviderName, build_provider
 
@@ -361,6 +368,41 @@ def test_python_xbox_provider_power_uses_cloud_command_runner() -> None:
     ]
 
 
+def test_python_xbox_provider_power_on_uses_resolved_wake_runner() -> None:
+    # Given: a real provider with an injected wake runner and a cloud power runner.
+    wake_commands: list[PowerCommand] = []
+    cloud_commands: list[PowerCommand] = []
+
+    def status_discovery(tokens_file: Path | None = None) -> Console:
+        _ = tokens_file
+        return discovered_console()
+
+    def wake_runner(command: PowerCommand) -> None:
+        wake_commands.append(command)
+
+    def power_runner(command: PowerCommand) -> None:
+        cloud_commands.append(command)
+
+    provider = PythonXboxProvider(
+        status_discovery=status_discovery,
+        wake_runner=wake_runner,
+        power_runner=power_runner,
+    )
+
+    # When: the console is woken.
+    action = provider.power(PowerAction.ON)
+
+    # Then: only the injected wake runner is called; cloud power runner is untouched.
+    assert action.message == "Sent on to Actual Series X."
+    assert wake_commands == [
+        PowerCommand(
+            console_id=ConsoleId("real-console-id"),
+            action=PowerAction.ON,
+        ),
+    ]
+    assert cloud_commands == []
+
+
 def test_python_xbox_provider_press_rejects_unknown_buttons() -> None:
     # Given: a real provider with no runner invoked yet.
     commands: list[PressCommand] = []
@@ -404,3 +446,130 @@ def test_build_provider_returns_real_boundary_when_requested() -> None:
 
     # Then: it returns the real provider boundary without touching the network.
     assert isinstance(provider, PythonXboxProvider)
+
+
+def test_composed_wake_runner_tries_cloud_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: cloud wake succeeds, so local wake should never be called.
+    cloud_calls: list[PowerCommand] = []
+    local_calls: list[PowerCommand] = []
+
+    def fake_cloud_runner(command: PowerCommand) -> None:
+        cloud_calls.append(command)
+
+    def fake_local_runner(command: PowerCommand) -> None:
+        local_calls.append(command)
+
+    def call_cloud_runner(self: object, command: PowerCommand) -> None:
+        _ = self
+        fake_cloud_runner(command)
+
+    def call_local_runner(self: object, command: PowerCommand) -> None:
+        _ = self
+        fake_local_runner(command)
+
+    monkeypatch.setattr(
+        "xboxctl.providers.real_runners.CloudPowerRunner.__call__",
+        call_cloud_runner,
+    )
+    monkeypatch.setattr(
+        "xboxctl.providers.real_runners.SmartGlassWakeRunner.__call__",
+        call_local_runner,
+    )
+
+    runner = ComposedWakeRunner()
+    command = PowerCommand(console_id=ConsoleId("live-id"), action=PowerAction.ON)
+
+    # When: the composed runner is called.
+    runner(command)
+
+    # Then: cloud is tried first and succeeds; local is never reached.
+    assert cloud_calls == [command]
+    assert local_calls == []
+
+
+def test_composed_wake_runner_falls_back_to_local(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: cloud wake fails, so local SmartGlass is tried as fallback.
+    cloud_calls: list[PowerCommand] = []
+    local_calls: list[PowerCommand] = []
+
+    def fake_cloud_runner(command: PowerCommand) -> None:
+        cloud_calls.append(command)
+        raise RealCommandError(reason="cloud unreachable")
+
+    def fake_local_runner(command: PowerCommand) -> None:
+        local_calls.append(command)
+
+    def call_cloud_runner(self: object, command: PowerCommand) -> None:
+        _ = self
+        fake_cloud_runner(command)
+
+    def call_local_runner(self: object, command: PowerCommand) -> None:
+        _ = self
+        fake_local_runner(command)
+
+    monkeypatch.setattr(
+        "xboxctl.providers.real_runners.CloudPowerRunner.__call__",
+        call_cloud_runner,
+    )
+    monkeypatch.setattr(
+        "xboxctl.providers.real_runners.SmartGlassWakeRunner.__call__",
+        call_local_runner,
+    )
+
+    runner = ComposedWakeRunner()
+    command = PowerCommand(console_id=ConsoleId("live-id"), action=PowerAction.ON)
+
+    # When: the composed runner is called.
+    runner(command)
+
+    # Then: both runners are invoked and the fallback completes without error.
+    assert cloud_calls == [command]
+    assert local_calls == [command]
+
+
+def test_read_cached_address_returns_none_when_no_cache(tmp_path: Path) -> None:
+    # Given: no address cache file exists.
+    tokens_file = tmp_path / "tokens.json"
+    _ = tokens_file.write_text("{}")
+
+    # When: the cached address is read.
+    address = read_cached_address(tokens_file)
+
+    # Then: None is returned because no cache exists yet.
+    assert address is None
+
+
+def test_read_cached_address_returns_cached_value(tmp_path: Path) -> None:
+    # Given: a cached console address was written previously.
+    tokens_file = tmp_path / "tokens.json"
+    _ = tokens_file.write_text("{}")
+    cache_file = address_cache_path(tokens_file)
+    _ = cache_file.write_text("10.0.0.42\n", encoding="utf-8")
+
+    # When: the cached address is read.
+    address = read_cached_address(tokens_file)
+
+    # Then: the previously cached address is returned.
+    assert address == "10.0.0.42"
+
+
+def test_composed_wake_runner_refuses_non_on_actions() -> None:
+    # Given: a composed wake runner.
+    runner = ComposedWakeRunner()
+
+    # When: a non-ON power command is given.
+    command = PowerCommand(console_id=ConsoleId("live-id"), action=PowerAction.OFF)
+
+    # Then: it raises immediately without trying any wake path.
+    try:
+        runner(command)
+    except RealCommandError as error:
+        message = str(error)
+    else:
+        message = "runner unexpectedly accepted a non-wake action"
+
+    assert "Wake runner cannot send" in message

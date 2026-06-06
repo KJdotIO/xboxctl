@@ -5,10 +5,13 @@
 # pyright: reportUnknownVariableType=false, reportUnusedCallResult=false
 import argparse
 import asyncio
+import contextlib
+import os
 import socket
 import sys
 import types
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Protocol
 
 from xboxctl.providers.network import preferred_local_ip_for_remote
@@ -92,6 +95,7 @@ async def press_button(button: str, repeat: int) -> None:
     if not consoles:
         raise ConsoleDiscoveryError
     console = consoles[0]
+    _cache_discovered_address(console.address)
     local_ip = preferred_local_ip_for_remote(console.address)
     console.add_manager(InputManager)
     transport_holder: dict[str, asyncio.DatagramTransport] = {}
@@ -137,12 +141,42 @@ async def press_button(button: str, repeat: int) -> None:
             await asyncio.sleep(0.2)
 
 
+async def wake_console(liveid: str, address: str | None, tries: int) -> None:
+    from xbox.sg.console import Console  # noqa: PLC0415
+
+    if address is None:
+        try:
+            consoles = await Console.discover(timeout=3)
+        except Exception:  # noqa: BLE001
+            consoles = []
+        if consoles:
+            discovered_address = consoles[0].address
+            if discovered_address is not None:
+                address = str(discovered_address)
+                _cache_discovered_address(address)
+
+    await Console.power_on(liveid, addr=address, tries=tries)
+
+
+def _cache_discovered_address(address: str) -> None:
+    tokens_env = os.environ.get("XBOXCTL_TOKENS_FILE")
+    if not tokens_env:
+        return
+    cache_file = Path(tokens_env).parent / "console_address"
+    with contextlib.suppress(OSError):
+        cache_file.write_text(f"{address}\n", encoding="utf-8")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="smartglass-worker")
     subparsers = parser.add_subparsers(dest="command", required=True)
     press_parser = subparsers.add_parser("press")
     _ = press_parser.add_argument("--button", required=True)
     _ = press_parser.add_argument("--repeat", type=int, required=True)
+    wake_parser = subparsers.add_parser("wake")
+    _ = wake_parser.add_argument("--liveid", required=True)
+    _ = wake_parser.add_argument("--address")
+    _ = wake_parser.add_argument("--tries", type=int, required=True)
     return parser
 
 
@@ -152,6 +186,15 @@ def main() -> int:
     try:
         if args.command == "press":
             asyncio.run(press_button(button=args.button, repeat=args.repeat))
+            return 0
+        if args.command == "wake":
+            asyncio.run(
+                wake_console(
+                    liveid=args.liveid,
+                    address=args.address,
+                    tries=args.tries,
+                ),
+            )
             return 0
     except (
         ConsoleConnectionTimeoutError,

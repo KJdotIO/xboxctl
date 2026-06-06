@@ -185,6 +185,23 @@ uv run xboxctl-mcp --http
 
 That starts the local server at `http://127.0.0.1:3000/mcp`.
 
+For clients that probe both streamable HTTP and SSE transports, run both on the
+same local server:
+
+```bash
+uv run xboxctl-mcp --dual-http
+```
+
+That exposes streamable HTTP at `/mcp` and SSE at `/sse`. If you publish the
+local server through a tunnel, allow the public host explicitly:
+
+```bash
+uv run xboxctl-mcp --dual-http --allow-host example.tailnet.ts.net
+```
+
+The observe tools return screenshots as MCP image content, so agents can show
+captured frames directly when their client supports images.
+
 For local tests, run:
 
 ```bash
