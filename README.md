@@ -4,8 +4,9 @@ Control an Xbox from the command line.
 
 `xboxctl` can list consoles, read console state, launch apps, send controller
 buttons, type text, control media, power a console on or off, and capture the
-screen through Remote Play. It is built for scripts and agents, but it is still
-comfortable to use by hand.
+screen through Remote Play. It can also control YouTube through YouTube's TV
+pairing flow. It is built for scripts and agents, but it is still comfortable
+to use by hand.
 
 ## Install
 
@@ -135,6 +136,34 @@ session file:
 uv run xboxctl observe cleanup --session-file /tmp/xbox-session.json
 ```
 
+## YouTube
+
+YouTube can be controlled through the same pairing flow used by phones and
+browsers.
+
+Open the YouTube app on the Xbox, go to **Settings -> Link with TV code**, then
+pair once:
+
+```bash
+uv run xboxctl youtube pair <tv-code>
+uv run xboxctl youtube status --json
+```
+
+After that, you can send YouTube controls without keeping a Remote Play stream
+open:
+
+```bash
+uv run xboxctl youtube play https://youtu.be/dQw4w9WgXcQ --confirm
+uv run xboxctl youtube pause --confirm
+uv run xboxctl youtube resume --confirm
+uv run xboxctl youtube seek 60 --confirm
+uv run xboxctl youtube next --confirm
+```
+
+The pairing is stored locally beside the Xbox token file. Set
+`XBOXCTL_YOUTUBE_FILE` if you want to keep it somewhere else. The same commands
+work with other YouTube TV apps that support linking with a TV code.
+
 ## MCP
 
 `xboxctl` includes a local MCP server for agents:
@@ -175,7 +204,8 @@ Once the package is published, the config can use `uvx` instead:
 ```
 
 The MCP exposes the normal Xbox tools directly: status, apps, storage, launch,
-button presses, text, media, power, and observe session controls.
+button presses, text, media, power, observe session controls, and YouTube
+pairing/playback controls.
 
 Some clients need an HTTP MCP endpoint instead of stdio:
 
@@ -229,6 +259,8 @@ Playwright, and the Xbox Remote Play helper packages listed in `package.json`.
   authentication.
 - [`xbox-xcloud-player`](https://www.npmjs.com/package/xbox-xcloud-player) for
   the browser Remote Play player used by observe mode.
+- [`pyytlounge`](https://pypi.org/project/pyytlounge/) for YouTube Lounge
+  pairing and playback controls.
 - The OpenXbox SmartGlass projects and documentation, which helped shape the
   local-control fallback.
 

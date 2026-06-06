@@ -1,4 +1,8 @@
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 import pytest
 from mcp.types import ImageContent, TextContent
@@ -7,6 +11,7 @@ from xboxctl import mcp_server
 from xboxctl.mcp_content import screenshot_content
 from xboxctl.observe import ObserveCaptureFormat
 from xboxctl.providers.select import ProviderName
+from xboxctl.youtube import YouTubeCommandResult, YouTubeStatus
 
 
 def test_mcp_status_returns_fake_console_when_fake_provider_selected(
@@ -230,3 +235,59 @@ def test_mcp_provider_args_accept_allowed_hosts() -> None:
 
     # Then: both hostnames are preserved.
     assert config.allowed_hosts == ("xboxctl.example.test", "example.test")
+
+
+@pytest.mark.anyio
+async def test_mcp_youtube_status_returns_structured_payload(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: the YouTube status helper reports a paired app.
+    async def status_stub(device_name: str = "xboxctl") -> YouTubeStatus:
+        assert device_name == "xboxctl"
+        return YouTubeStatus(
+            paired=True,
+            available=True,
+            screen_name="Xbox YouTube",
+            token_file=tmp_path / "youtube.json",
+        )
+
+    monkeypatch.setattr(mcp_server, "get_youtube_status", status_stub)
+
+    # When: the MCP status wrapper is called.
+    status_tool = cast(
+        "Callable[[], Awaitable[mcp_server.YouTubeStatusPayload]]",
+        mcp_server.youtube_status,
+    )
+    payload = await status_tool()
+
+    # Then: the result is simple JSON for agents.
+    assert payload["paired"] is True
+    assert payload["available"] is True
+    assert payload["screen_name"] == "Xbox YouTube"
+
+
+@pytest.mark.anyio
+async def test_mcp_youtube_play_returns_message(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Given: the YouTube play helper succeeds.
+    async def play_stub(video: str) -> YouTubeCommandResult:
+        assert video == "dQw4w9WgXcQ"
+        return YouTubeCommandResult(
+            message="Playing YouTube video dQw4w9WgXcQ.",
+            token_file=tmp_path / "youtube.json",
+        )
+
+    monkeypatch.setattr(mcp_server, "play_youtube_video", play_stub)
+
+    # When: the MCP play wrapper is called.
+    play_tool = cast(
+        "Callable[[str], Awaitable[mcp_server.MessagePayload]]",
+        mcp_server.youtube_play,
+    )
+    payload = await play_tool("dQw4w9WgXcQ")
+
+    # Then: the action message is returned.
+    assert payload == {"message": "Playing YouTube video dQw4w9WgXcQ."}

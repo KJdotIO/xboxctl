@@ -10,6 +10,7 @@ dependencies = [
     "httpx>=0.28.1",
     "mcp[cli]>=1.12.4,<2",
     "pydantic>=2.13.4",
+    "pyytlounge>=3.2.0",
     "rich>=14.0.0",
     "typer>=0.16.0",
     "typing-extensions>=4.15.0",
@@ -81,6 +82,9 @@ unfixable = []
     "D",
     "PLR2004",
     "S101",
+    "S105",
+    "S106",
+    "S108",
     "SLF001",
 ]
 

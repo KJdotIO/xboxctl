@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from typing import NoReturn
 
 import typer
@@ -10,6 +11,7 @@ from xboxctl.serialise import AppPayload, ConsolePayload, McpPayload, StoragePay
 
 type JsonPayload = (
     McpPayload | list[ConsolePayload] | list[StoragePayload] | list[AppPayload]
+    | Mapping[str, object]
 )
 
 MIN_REPEAT = 1

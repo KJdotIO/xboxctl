@@ -29,6 +29,7 @@ from xboxctl.serialise import (
     console_payload,
     storage_payload,
 )
+from xboxctl.youtube_cli import youtube_app
 
 app = typer.Typer(
     help="Xbox CLI controls.",
@@ -38,6 +39,7 @@ mcp_app = typer.Typer(help="Machine-readable command descriptions.")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(auth_app, name="auth")
 app.add_typer(observe_app, name="observe")
+app.add_typer(youtube_app, name="youtube")
 console = RichConsole()
 DEFAULT_PROVIDER = ProviderName.REAL
 selected_provider = DEFAULT_PROVIDER
@@ -280,6 +282,7 @@ def mcp_describe() -> None:
             {"command": "media", "requires_confirm": True},
             {"command": "power", "requires_confirm": True},
             {"command": "observe", "requires_confirm": False},
+            {"command": "youtube", "requires_confirm": False},
         ],
     }
     if selected_provider == ProviderName.FAKE:

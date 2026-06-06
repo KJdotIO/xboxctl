@@ -42,6 +42,18 @@ from xboxctl.serialise import (
     console_payload,
     storage_payload,
 )
+from xboxctl.youtube import (
+    DEFAULT_DEVICE_NAME,
+    disconnect_youtube,
+    get_youtube_status,
+    next_youtube,
+    pair_youtube,
+    pause_youtube,
+    play_youtube_video,
+    previous_youtube,
+    resume_youtube,
+    seek_youtube,
+)
 
 HTTP_HOST: Final = "127.0.0.1"
 HTTP_PORT: Final = 3000
@@ -115,6 +127,14 @@ class ObserveCleanupPayload(TypedDict):
     stopped: bool
     removed: bool
     status: ObserveStatusPayload
+
+
+class YouTubeStatusPayload(TypedDict):
+    paired: bool
+    available: bool | None
+    screen_name: str | None
+    token_file: str
+    reason: str | None
 
 
 def provider() -> XboxProvider:
@@ -478,6 +498,108 @@ def cleanup_observe(
         "removed": result.removed,
         "status": observe_status_payload(Path(session_file)),
     }
+
+
+@mcp.tool(
+    name="youtube_pair",
+    description="Pair xboxctl with the YouTube TV app using a TV code.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_pair(
+    code: str,
+    device_name: str = DEFAULT_DEVICE_NAME,
+) -> MessagePayload:
+    result = await pair_youtube(code, device_name=device_name)
+    target = result.screen_name or "YouTube"
+    return {"message": f"Paired {target}. Token file: {result.token_file}."}
+
+
+@mcp.tool(
+    name="youtube_status",
+    description="Check whether YouTube TV pairing is ready and reachable.",
+    annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False),
+)
+async def youtube_status(
+    device_name: str = DEFAULT_DEVICE_NAME,
+) -> YouTubeStatusPayload:
+    result = await get_youtube_status(device_name=device_name)
+    return {
+        "paired": result.paired,
+        "available": result.available,
+        "screen_name": result.screen_name,
+        "token_file": str(result.token_file),
+        "reason": result.reason,
+    }
+
+
+@mcp.tool(
+    name="youtube_play",
+    description="Play a YouTube video by video ID or URL on the paired YouTube app.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_play(video: str) -> MessagePayload:
+    result = await play_youtube_video(video)
+    return {"message": result.message}
+
+
+@mcp.tool(
+    name="youtube_pause",
+    description="Pause playback on the paired YouTube app.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_pause() -> MessagePayload:
+    result = await pause_youtube()
+    return {"message": result.message}
+
+
+@mcp.tool(
+    name="youtube_resume",
+    description="Resume playback on the paired YouTube app.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_resume() -> MessagePayload:
+    result = await resume_youtube()
+    return {"message": result.message}
+
+
+@mcp.tool(
+    name="youtube_seek",
+    description="Seek YouTube playback to an absolute time in seconds.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_seek(seconds: float) -> MessagePayload:
+    result = await seek_youtube(seconds)
+    return {"message": result.message}
+
+
+@mcp.tool(
+    name="youtube_next",
+    description="Skip to the next YouTube video on the paired YouTube app.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_next() -> MessagePayload:
+    result = await next_youtube()
+    return {"message": result.message}
+
+
+@mcp.tool(
+    name="youtube_previous",
+    description="Go to the previous YouTube video on the paired YouTube app.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_previous() -> MessagePayload:
+    result = await previous_youtube()
+    return {"message": result.message}
+
+
+@mcp.tool(
+    name="youtube_disconnect",
+    description="Disconnect the current YouTube Lounge control session.",
+    annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=False),
+)
+async def youtube_disconnect() -> MessagePayload:
+    result = await disconnect_youtube()
+    return {"message": result.message}
 
 
 def argument_value(arguments: Sequence[str], index: int, option: str) -> str:
