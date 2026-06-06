@@ -8,6 +8,7 @@ license = "MIT"
 dependencies = [
     "anyio>=4.13.0",
     "httpx>=0.28.1",
+    "mcp[cli]>=1.12.4,<2",
     "pydantic>=2.13.4",
     "rich>=14.0.0",
     "typer>=0.16.0",
@@ -25,6 +26,7 @@ build-backend = "hatchling.build"
 
 [project.scripts]
 xboxctl = "xboxctl.cli:app"
+xboxctl-mcp = "xboxctl.mcp_server:main"
 
 [dependency-groups]
 dev = [

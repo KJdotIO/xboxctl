@@ -137,15 +137,51 @@ uv run xboxctl observe cleanup --session-file /tmp/xbox-session.json
 
 ## MCP
 
-The CLI already exposes a machine-readable command manifest:
+`xboxctl` includes a local MCP server for agents:
 
 ```bash
-uv run xboxctl mcp describe
+uv run xboxctl-mcp
 ```
 
-That gives an MCP server a simple starting point: read-only commands can be
-exposed directly, while launch, input, media, and power commands can keep their
-confirmation step.
+For local development, add it to an MCP client with:
+
+```json
+{
+  "mcpServers": {
+    "xboxctl": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/Users/dot/xboxcli",
+        "run",
+        "xboxctl-mcp"
+      ]
+    }
+  }
+}
+```
+
+Once the package is published, the config can use `uvx` instead:
+
+```json
+{
+  "mcpServers": {
+    "xboxctl": {
+      "command": "uvx",
+      "args": ["xboxctl-mcp"]
+    }
+  }
+}
+```
+
+The MCP exposes the normal Xbox tools directly: status, apps, storage, launch,
+button presses, text, media, power, and observe session controls.
+
+For local tests, run:
+
+```bash
+uv run xboxctl-mcp --provider fake
+```
 
 ## Development
 
