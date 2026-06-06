@@ -15,6 +15,10 @@ def run_cli_with_env(arguments: list[str], env: dict[str, str]) -> Result:
     return runner.invoke(app, arguments)
 
 
+def fake_arguments(arguments: list[str]) -> list[str]:
+    return ["--provider", "fake", *arguments]
+
+
 def test_version_prints_version() -> None:
     # Given: the installed CLI app.
     arguments = ["--version"]
@@ -28,8 +32,8 @@ def test_version_prints_version() -> None:
 
 
 def test_status_json_returns_sample_console_state() -> None:
-    # Given: the offline fake provider.
-    arguments = ["status", "--json"]
+    # Given: the offline fake provider is selected explicitly.
+    arguments = fake_arguments(["status", "--json"])
 
     # When: status is requested as JSON.
     result = run_cli(arguments)
@@ -41,17 +45,18 @@ def test_status_json_returns_sample_console_state() -> None:
     assert '"active_title": "Halo Infinite"' in result.stdout
 
 
-def test_fake_provider_is_default_for_consoles() -> None:
-    # Given: no provider flag or environment override.
+def test_real_provider_is_default_for_consoles_without_auth(tmp_path: Path) -> None:
+    # Given: no provider flag or environment override, and no Xbox token file.
+    token_file = tmp_path / "tokens.json"
     arguments = ["consoles"]
 
     # When: consoles are listed.
-    result = run_cli(arguments)
+    result = run_cli_with_env(arguments, {"XBOXCTL_TOKENS_FILE": str(token_file)})
 
-    # Then: the deterministic fake console is still used.
-    assert result.exit_code == 0
-    assert "Living Room Series X" in result.stdout
-    assert "Halo Infinite" in result.stdout
+    # Then: the real provider asks for auth instead of falling back to fake data.
+    assert result.exit_code == 1
+    assert "Real Xbox provider is not configured." in result.output
+    assert "uv run xboxctl auth login" in result.output
 
 
 def test_fake_provider_can_be_selected_explicitly() -> None:
@@ -69,7 +74,7 @@ def test_fake_provider_can_be_selected_explicitly() -> None:
 def test_real_provider_without_auth_fails_with_setup_message() -> None:
     # Given: the real provider is requested without Xbox credentials.
     runner = CliRunner(env={"XBOXCTL_TOKENS_FILE": "/missing/xboxctl/tokens.json"})
-    arguments = ["--provider", "real", "consoles"]
+    arguments = ["consoles"]
 
     # When: consoles are listed.
     result = runner.invoke(app, arguments)
@@ -77,7 +82,7 @@ def test_real_provider_without_auth_fails_with_setup_message() -> None:
     # Then: the CLI gives a clear setup failure without pretending success.
     assert result.exit_code == 1
     assert "Real Xbox provider is not configured." in result.output
-    assert "XBOXCTL_PROVIDER=fake" in result.output
+    assert "uv run xboxctl auth login" in result.output
     assert "No console command was sent." in result.output
 
 
@@ -327,8 +332,8 @@ def test_auth_login_dry_run_does_not_print_secret(tmp_path: Path) -> None:
 
 
 def test_storage_json_reports_usage() -> None:
-    # Given: the offline fake provider.
-    arguments = ["storage", "--json"]
+    # Given: the offline fake provider is selected explicitly.
+    arguments = fake_arguments(["storage", "--json"])
 
     # When: storage is requested as JSON.
     result = run_cli(arguments)
@@ -341,8 +346,8 @@ def test_storage_json_reports_usage() -> None:
 
 
 def test_apps_json_lists_known_titles() -> None:
-    # Given: the offline fake provider.
-    arguments = ["apps", "--json"]
+    # Given: the offline fake provider is selected explicitly.
+    arguments = fake_arguments(["apps", "--json"])
 
     # When: apps are requested as JSON.
     result = run_cli(arguments)
@@ -367,7 +372,7 @@ def test_launch_refuses_without_confirm() -> None:
 
 def test_launch_accepts_known_app_with_confirm() -> None:
     # Given: a confirmed launch request for a known game.
-    arguments = ["launch", "Halo", "--confirm"]
+    arguments = fake_arguments(["launch", "Halo", "--confirm"])
 
     # When: the command is invoked.
     result = run_cli(arguments)
@@ -403,7 +408,7 @@ def test_text_rejects_empty_input() -> None:
 
 def test_text_keeps_meaningful_outer_spaces() -> None:
     # Given: a confirmed text command with meaningful surrounding spaces.
-    arguments = ["text", " hello ", "--confirm"]
+    arguments = fake_arguments(["text", " hello ", "--confirm"])
 
     # When: the command is invoked.
     result = run_cli(arguments)
@@ -415,7 +420,7 @@ def test_text_keeps_meaningful_outer_spaces() -> None:
 
 def test_doctor_reports_provider_and_route_for_console_ip() -> None:
     # Given: a local route diagnostic request for a reachable loopback address.
-    arguments = ["doctor", "--console-ip", "127.0.0.1"]
+    arguments = fake_arguments(["doctor", "--console-ip", "127.0.0.1"])
 
     # When: diagnostics are requested.
     result = run_cli(arguments)
@@ -446,10 +451,22 @@ def test_doctor_reports_auth_setup_when_token_file_is_missing(tmp_path: Path) ->
 def test_media_power_press_and_text_confirmed_actions() -> None:
     # Given: confirmed mutating commands for the remaining v1 actions.
     commands = [
-        (["press", "a", "--repeat", "2", "--confirm"], "Pressed a 2 times"),
-        (["text", "hello there", "--confirm"], "Sent text to Living Room Series X"),
-        (["media", "pause", "--confirm"], "Sent pause to Living Room Series X"),
-        (["power", "reboot", "--confirm"], "Sent reboot to Living Room Series X"),
+        (
+            fake_arguments(["press", "a", "--repeat", "2", "--confirm"]),
+            "Pressed a 2 times",
+        ),
+        (
+            fake_arguments(["text", "hello there", "--confirm"]),
+            "Sent text to Living Room Series X",
+        ),
+        (
+            fake_arguments(["media", "pause", "--confirm"]),
+            "Sent pause to Living Room Series X",
+        ),
+        (
+            fake_arguments(["power", "reboot", "--confirm"]),
+            "Sent reboot to Living Room Series X",
+        ),
     ]
 
     # When: each command is invoked.
@@ -471,6 +488,7 @@ def test_mcp_describe_lists_supported_commands() -> None:
 
     # Then: supported v1 commands are listed.
     assert result.exit_code == 0
+    assert '"provider": "real"' in result.stdout
     assert '"command": "status"' in result.stdout
     assert '"command": "launch"' in result.stdout
     assert '"command": "auth"' in result.stdout

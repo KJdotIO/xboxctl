@@ -7,9 +7,6 @@ buttons, type text, control media, power a console on or off, and capture the
 screen through Remote Play. It is built for scripts and agents, but it is still
 comfortable to use by hand.
 
-The default provider is fake, so you can try the CLI without an Xbox account or
-a console on your network.
-
 ## Install
 
 ```bash
@@ -19,7 +16,7 @@ uv sync
 uv run xboxctl --help
 ```
 
-For real Xbox commands, install the optional provider dependencies:
+Install the real Xbox provider dependencies:
 
 ```bash
 uv sync --extra real
@@ -36,6 +33,8 @@ npx playwright install chromium
 ## Quick Start
 
 ```bash
+uv run xboxctl auth login
+uv run xboxctl auth validate
 uv run xboxctl consoles
 uv run xboxctl status --json
 uv run xboxctl apps
@@ -45,9 +44,9 @@ uv run xboxctl launch Halo --confirm
 Read-only commands run straight away. Commands that change console state require
 `--confirm`, which makes them safer to use in scripts.
 
-## Real Xbox Setup
+## Xbox Setup
 
-Sign in once before using the real provider:
+Sign in once before sending commands:
 
 ```bash
 uv run xboxctl auth login
@@ -61,23 +60,21 @@ If your browser keeps choosing the wrong Microsoft account, force a fresh login:
 uv run xboxctl auth login --prompt login
 ```
 
-Then use the real provider:
+Then use the CLI:
 
 ```bash
-uv run xboxctl --provider real consoles
-uv run xboxctl --provider real status --json
-uv run xboxctl --provider real apps --json
-uv run xboxctl --provider real press dpad-right --confirm
-uv run xboxctl --provider real launch YouTube --confirm
-uv run xboxctl --provider real power off --confirm
-uv run xboxctl --provider real power on --confirm
+uv run xboxctl consoles
+uv run xboxctl status --json
+uv run xboxctl apps --json
+uv run xboxctl press dpad-right --confirm
+uv run xboxctl launch YouTube --confirm
+uv run xboxctl power off --confirm
+uv run xboxctl power on --confirm
 ```
 
-You can also set the provider once for a shell:
-
-```bash
-export XBOXCTL_PROVIDER=real
-```
+For local development and CI, use the fake provider explicitly with
+`--provider fake` or `XBOXCTL_PROVIDER=fake`. It returns stable sample data and
+does not contact Xbox services.
 
 ## Observe
 

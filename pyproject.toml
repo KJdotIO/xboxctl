@@ -1,7 +1,7 @@
 [project]
 name = "xboxctl"
 version = "0.1.0"
-description = "A CLI-first, offline-safe Xbox control tool."
+description = "Control an Xbox from the command line."
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"

@@ -33,9 +33,8 @@ UNKNOWN_ACTIVE_TITLE: Final = "Unknown"
 BYTES_PER_GIB: Final = 1024 * 1024 * 1024
 REAL_PROVIDER_NOT_CONFIGURED: Final = (
     "Real Xbox provider is not configured. Run `uv run xboxctl auth login`, then "
-    "`uv run xboxctl auth validate`. Keep using the offline provider with "
-    "--provider fake or XBOXCTL_PROVIDER=fake until setup is complete. No console "
-    "command was sent."
+    "`uv run xboxctl auth validate`. For local tests, use --provider fake or "
+    "XBOXCTL_PROVIDER=fake. No console command was sent."
 )
 MISSING_REAL_PROVIDER_TOOLS: Final = (
     "Real-provider dependencies are missing. Run: uv sync --extra real"

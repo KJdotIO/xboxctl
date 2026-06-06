@@ -30,7 +30,7 @@ from xboxctl.serialise import (
 )
 
 app = typer.Typer(
-    help="Offline-safe Xbox CLI controls.",
+    help="Xbox CLI controls.",
     no_args_is_help=True,
 )
 mcp_app = typer.Typer(help="Machine-readable command descriptions.")
@@ -38,7 +38,7 @@ app.add_typer(mcp_app, name="mcp")
 app.add_typer(auth_app, name="auth")
 app.add_typer(observe_app, name="observe")
 console = RichConsole()
-DEFAULT_PROVIDER = ProviderName.FAKE
+DEFAULT_PROVIDER = ProviderName.REAL
 selected_provider = DEFAULT_PROVIDER
 
 
